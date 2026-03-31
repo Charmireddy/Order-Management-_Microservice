@@ -1,0 +1,22 @@
+{
+  "mappings": [
+    {
+      "name": "Payment Success",
+      "request": {
+        "method": "POST",
+        "url": "/api/v1/payments"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "paymentId": "pay-{{randomValue type='UUID'}}",
+          "status": "SUCCESS",
+          "message": "Payment processed successfully"
+        }
+      }
+    }
+  ]
+}

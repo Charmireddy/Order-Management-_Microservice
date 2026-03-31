@@ -1,0 +1,14 @@
+# Test profile — disables real Redis so unit tests run without infrastructure
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6370   # intentionally wrong port — tests mock the Redis layer
+
+payment:
+  service:
+    url: http://localhost:9999   # not called in unit tests
+
+logging:
+  level:
+    com.orderservice: WARN

@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+
+  # ── Redis — idempotency store + rate-limit counters ────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: order-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - order-network
+
+  # ── Mock Payment Service (WireMock) ────────────────────────────────────────
+  payment-service-mock:
+    image: wiremock/wiremock:3.3.1-alpine
+    container_name: payment-service-mock
+    ports:
+      - "9090:8080"
+    volumes:
+      - ./wiremock:/home/wiremock
+    command: --verbose --global-response-templating
+    networks:
+      - order-network
+
+  # ── Order Service ──────────────────────────────────────────────────────────
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: order-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PAYMENT_SERVICE_URL=http://payment-service-mock:8080
+    depends_on:
+      redis:
+        condition: service_healthy
+      payment-service-mock:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/orders/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - order-network
+    restart: on-failure
+
+networks:
+  order-network:
+    driver: bridge
+
+volumes:
+  redis-data:

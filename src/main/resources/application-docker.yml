@@ -1,0 +1,14 @@
+# Docker profile — overrides defaults in application.yml
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+
+payment:
+  service:
+    url: ${PAYMENT_SERVICE_URL:http://payment-service-mock:8080}
+
+logging:
+  level:
+    com.orderservice: INFO

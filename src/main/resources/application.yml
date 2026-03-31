@@ -1,0 +1,109 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: order-service
+
+  # H2 in-memory database (dev/demo)
+  datasource:
+    url: jdbc:h2:mem:orderdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # Redis configuration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 2
+
+# Payment service URL (mocked / stubbed)
+payment:
+  service:
+    url: ${PAYMENT_SERVICE_URL:http://localhost:9090}
+    timeout: 3000
+
+# ─────────────────────────────────────────────
+#  Resilience4j — Circuit Breaker (the 97% story)
+# ─────────────────────────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentService:
+        # Count-based sliding window of last 10 calls
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        # Open circuit when ≥ 50% of calls fail
+        failureRateThreshold: 50
+        # Wait 10 s in OPEN before switching to HALF-OPEN
+        waitDurationInOpenState: 10s
+        # Allow 3 test calls in HALF-OPEN state
+        permittedNumberOfCallsInHalfOpenState: 3
+        # Don't open until at least 5 calls have been made
+        minimumNumberOfCalls: 5
+        # Exceptions that count as failures
+        recordExceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.reactive.function.client.WebClientResponseException
+        registerHealthIndicator: true
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
+  ratelimiter:
+    instances:
+      orderApi:
+        # 10 requests per second
+        limitForPeriod: 10
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0s
+
+  retry:
+    instances:
+      paymentService:
+        maxAttempts: 3
+        waitDuration: 500ms
+        retryExceptions:
+          - java.io.IOException
+
+# Actuator — expose circuit-breaker health + metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,prometheus
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+# Idempotency key TTL in Redis (seconds)
+idempotency:
+  ttl-seconds: 86400   # 24 hours
+
+logging:
+  level:
+    com.orderservice: DEBUG
+    io.github.resilience4j: INFO
